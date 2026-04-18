@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = ".output/public"
+
+[build.environment]
+  SERVER_PRESET = "netlify"
+
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/handler"
+  status = 200
