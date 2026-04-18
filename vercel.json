@@ -1,7 +1,6 @@
 {
-    "version": 2,
-    "framework": "vite",
-    "rewrites": [
-      { "source": "/(.*)", "destination": "/" }
+    "version": 3,
+    "routes": [
+      { "src": "/(.*)", "dest": "/index.html" }
     ]
   }
