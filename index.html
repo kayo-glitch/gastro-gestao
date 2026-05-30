@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GastroGestão</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                DEFAULT: '#bc834e', // O bronze/doce de leite da Foto 90
+                foreground: '#ffffff',
+              },
+              background: '#faf7f2',
+            }
+          }
+        }
+      }
+    </script>
+    
+    <style type="text/css">
+      /* FORÇANDO O FUNDO CREME NA MARRA */
+      html, body {
+        margin: 0;
+        padding: 0;
+        background-color: #faf7f2 !important; 
+        background-image: radial-gradient(circle at top right, #faf7f2 0%, #f1e6d8 100%) !important;
+        min-height: 100vh;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+
+      /* Garantindo que os botões usem a cor bronze */
+      .bg-primary { background-color: #bc834e !important; }
+      .text-primary { color: #bc834e !important; }
+
+      /* Efeito de vidro para os cards */
+      .glass-card {
+        background: rgba(255, 255, 255, 0.7) !important;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+    </style>
+    
+    <link rel="stylesheet" href="/src/styles.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/router.tsx"></script>
+  </body>
+</html>

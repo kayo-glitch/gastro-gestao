@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Calendar as CalendarIcon, Plus, Trash2, CheckCircle2, Archive, RotateCcw, X } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, Trash2, CheckCircle2, Archive, RotateCcw, X, Pencil } from "lucide-react";
 import { format, parseISO, isValid, isToday, isTomorrow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -47,7 +47,8 @@ function EncomendasPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Encomenda | null>(null);
 
-  // Estados do formulário
+  // Estados do formulário e edição
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(undefined);
   const [orderDescription, setOrderDescription] = useState("");
@@ -81,7 +82,25 @@ function EncomendasPage() {
     if (user) void fetchOrders();
   }, [user]);
 
-  async function handleAddOrder() {
+  // Função para carregar dados no formulário para editar
+  function handleEdit(order: Encomenda) {
+    setEditingId(order.id);
+    setCustomerName(order.customerName);
+    setDeliveryDate(parseISO(order.deliveryDate));
+    setOrderDescription(order.orderDescription || "");
+    setExtraInsumos(order.extraInsumos || "");
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setCustomerName("");
+    setDeliveryDate(undefined);
+    setOrderDescription("");
+    setExtraInsumos("");
+  }
+
+  async function handleSaveOrder() {
     if (!customerName.trim() || !deliveryDate || !user) {
       toast.error("Preencha o nome e a data!");
       return;
@@ -89,26 +108,36 @@ function EncomendasPage() {
 
     setSaving(true);
     try {
-      const { error } = await (supabase.from("encomendas") as any).insert({
+      const orderData = {
         user_id: user.id,
         cliente_nome: customerName.trim(),
         data_entrega: format(deliveryDate, "yyyy-MM-dd"),
         order_description: orderDescription.trim(),
         extra_insumos: extraInsumos.trim(),
-        arquivada: false
-      });
+      };
+
+      let error;
+      if (editingId) {
+        // Lógica de Update
+        const { error: updateError } = await (supabase.from("encomendas") as any)
+          .update(orderData)
+          .eq('id', editingId);
+        error = updateError;
+      } else {
+        // Lógica de Insert
+        const { error: insertError } = await (supabase.from("encomendas") as any)
+          .insert({ ...orderData, arquivada: false });
+        error = insertError;
+      }
 
       if (error) throw error;
 
-      setCustomerName("");
-      setDeliveryDate(undefined);
-      setOrderDescription("");
-      setExtraInsumos("");
+      resetForm();
       await fetchOrders();
-      toast.success("Encomenda salva com sucesso!");
+      toast.success(editingId ? "Encomenda atualizada!" : "Encomenda salva com sucesso!");
     } catch (error) {
-      console.error("Failed to save encomenda", error);
-      toast.error("Erro ao salvar encomenda.");
+      console.error("Save failed", error);
+      toast.error("Erro ao salvar.");
     } finally {
       setSaving(false);
     }
@@ -163,9 +192,16 @@ function EncomendasPage() {
     <div className="min-h-screen bg-background pb-24">
       <PageHeader title="Encomendas" subtitle={`${orders.length} pendentes`} />
 
-      {/* FORMULÁRIO */}
-      <div className="mx-4 mb-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <p className="mb-3 text-sm font-semibold text-foreground">Nova encomenda</p>
+      {/* FORMULÁRIO (USA A MESMA UI PARA ADICIONAR OU EDITAR) */}
+      <div className="mx-4 mb-4 rounded-2xl border border-[#bc834e]/20 bg-card p-4 shadow-sm">
+        <div className="flex justify-between items-center mb-3">
+          <p className="text-sm font-semibold text-foreground">
+            {editingId ? "Editando encomenda" : "Nova encomenda"}
+          </p>
+          {editingId && (
+            <button onClick={resetForm} className="text-xs text-destructive font-bold">Cancelar</button>
+          )}
+        </div>
         <div className="space-y-3">
           <Input
             placeholder="Nome do Cliente"
@@ -207,9 +243,9 @@ function EncomendasPage() {
             className="h-11"
           />
 
-          <Button className="w-full h-11" onClick={handleAddOrder} disabled={saving}>
-            <Plus className={cn("mr-2 h-4 w-4", saving && "animate-spin")} />
-            {saving ? "Salvando..." : "Adicionar Encomenda"}
+          <Button className="w-full h-11 bg-[#bc834e] hover:bg-[#a67243]" onClick={handleSaveOrder} disabled={saving}>
+            <CheckCircle2 className={cn("mr-2 h-4 w-4", saving && "animate-spin")} />
+            {saving ? "Salvando..." : editingId ? "Atualizar Encomenda" : "Adicionar Encomenda"}
           </Button>
         </div>
       </div>
@@ -217,7 +253,7 @@ function EncomendasPage() {
       {/* LISTA ATIVA */}
       <div className="space-y-6 px-4">
         {groupedByDate.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground font-medium">
             Nenhuma encomenda pendente.
           </div>
         ) : (
@@ -228,8 +264,8 @@ function EncomendasPage() {
             return (
               <div key={date} className="space-y-2">
                 <p className={cn(
-                  "text-xs font-bold uppercase tracking-wider",
-                  isNear ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                  "text-[10px] font-black uppercase tracking-widest",
+                  isNear ? "text-green-600" : "text-muted-foreground"
                 )}>
                   {isValid(parsedDate) 
                     ? format(parsedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })
@@ -243,11 +279,11 @@ function EncomendasPage() {
                     key={item.id} 
                     className={cn(
                       "relative rounded-2xl border bg-card p-4 shadow-sm transition-all",
-                      isNear ? "border-green-500/50 bg-green-50/30 dark:bg-green-900/10" : "border-border"
+                      isNear ? "border-green-500/30 bg-green-50/50" : "border-border"
                     )}
                   >
                     <div className="flex justify-between items-start">
-                      <div className="pr-16 cursor-pointer" onClick={() => setSelectedOrder(item)}>
+                      <div className="pr-20 cursor-pointer flex-1" onClick={() => setSelectedOrder(item)}>
                         <p className="font-bold text-foreground text-lg">{item.customerName}</p>
                         {item.orderDescription && (
                           <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{item.orderDescription}</p>
@@ -255,6 +291,15 @@ function EncomendasPage() {
                       </div>
 
                       <div className="flex gap-1">
+                        {/* BOTÃO EDITAR */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 text-blue-600 hover:bg-blue-50"
+                          onClick={() => handleEdit(item)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -273,12 +318,6 @@ function EncomendasPage() {
                         </Button>
                       </div>
                     </div>
-                    
-                    {isNear && (
-                      <div className="absolute -top-2 left-4 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm">
-                        PRÓXIMA ENTREGA
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -287,7 +326,7 @@ function EncomendasPage() {
         )}
       </div>
 
-      {/* SEÇÃO DE ARQUIVADOS */}
+      {/* SEÇÃO DE ARQUIVADOS E MODAL DE DETALHES (CONTINUAM IGUAIS AO ANTERIOR) */}
       <div className="mt-12 px-4 pb-12">
         <Button 
           variant="ghost" 
@@ -327,46 +366,51 @@ function EncomendasPage() {
         )}
       </div>
 
-      {/* MODAL DE DETALHES */}
       {selectedOrder && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setSelectedOrder(null)}>
-          <div className="w-full max-w-sm rounded-3xl bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <div className="mb-4 flex justify-between items-center border-b pb-4">
-              <h3 className="text-lg font-bold">Detalhes do Pedido</h3>
+          <div className="w-full max-w-sm rounded-3xl bg-[#faf7f2] p-6 shadow-2xl animate-in zoom-in-95 duration-200 border border-[#bc834e]/20" onClick={e => e.stopPropagation()}>
+            <div className="mb-5 flex justify-between items-center border-b border-[#bc834e]/10 pb-4">
+              <h3 className="text-lg font-bold text-foreground">Detalhes do Pedido</h3>
               <Button variant="ghost" size="icon" onClick={() => setSelectedOrder(null)} className="rounded-full">
-                <X className="h-5 w-5" />
+                <X className="h-5 w-5 text-muted-foreground" />
               </Button>
             </div>
             
-            <div className="space-y-5">
+            <div className="space-y-6">
               <section>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Cliente</p>
+                <p className="text-[10px] uppercase font-bold text-[#bc834e] tracking-widest mb-1">Cliente</p>
                 <p className="text-xl font-bold text-foreground">{selectedOrder.customerName}</p>
               </section>
 
               <section>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">O que foi pedido</p>
-                <div className="bg-muted/50 p-4 rounded-2xl italic text-sm text-foreground leading-relaxed">
+                <p className="text-[10px] uppercase font-bold text-[#bc834e] tracking-widest mb-1">O que foi pedido</p>
+                <div className="bg-white p-4 rounded-2xl italic text-sm text-foreground leading-relaxed border border-[#bc834e]/10 shadow-sm">
                   {selectedOrder.orderDescription || "Sem descrição detalhada."}
                 </div>
               </section>
 
               {selectedOrder.extraInsumos && (
                 <section>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Insumos Extras</p>
-                  <p className="text-sm text-primary font-bold bg-primary/10 px-3 py-2 rounded-xl border border-primary/20">
-                    {selectedOrder.extraInsumos}
-                  </p>
+                  <p className="text-[10px] uppercase font-bold text-[#bc834e] tracking-widest mb-1">Insumos Extras</p>
+                  <div className="bg-[#bc834e]/10 px-4 py-3 rounded-xl border border-[#bc834e]/30">
+                    <p className="text-sm text-[#a67243] font-bold">
+                      {selectedOrder.extraInsumos}
+                    </p>
+                  </div>
                 </section>
               )}
 
-              <section className="flex justify-between items-center pt-2 border-t border-border">
+              <section className="flex justify-between items-center pt-4 border-t border-[#bc834e]/10">
                 <div>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Entrega prevista</p>
-                  <p className="text-sm font-semibold">{selectedOrder.deliveryDate}</p>
+                  <p className="text-[10px] uppercase font-bold text-[#bc834e] tracking-widest">Entrega prevista</p>
+                  <p className="text-sm font-bold text-foreground">
+                    {isValid(parseISO(selectedOrder.deliveryDate)) 
+                      ? format(parseISO(selectedOrder.deliveryDate), "dd/MM/yyyy")
+                      : selectedOrder.deliveryDate}
+                  </p>
                 </div>
                 <div className={cn(
-                  "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
+                  "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter shadow-sm",
                   selectedOrder.arquivada ? "bg-muted text-muted-foreground" : "bg-green-500 text-white"
                 )}>
                   {selectedOrder.arquivada ? "Entregue" : "Pendente"}
@@ -374,7 +418,7 @@ function EncomendasPage() {
               </section>
             </div>
             
-            <Button className="w-full mt-8 h-12 rounded-2xl text-base font-bold" onClick={() => setSelectedOrder(null)}>
+            <Button className="w-full mt-8 h-12 rounded-2xl text-base font-bold bg-[#bc834e] text-white" onClick={() => setSelectedOrder(null)}>
               Fechar Detalhes
             </Button>
           </div>

@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,14 +19,17 @@ import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
 import { useApproval } from "@/hooks/use-approval";
 import { BlockedScreen } from "@/components/BlockedScreen";
-import { KeyRound, CheckCircle, LogOut, User } from "lucide-react";
+import { KeyRound, CheckCircle, LogOut, User, MessageCircle, MessageSquare, Send, ShieldCheck, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { APP_CURRENCIES, type AppLanguage, usePreferences } from "@/lib/preferences";
 
 export const Route = createFileRoute("/perfil")({
   head: () => ({
     meta: [
       { title: "Perfil — GastroGestão📈" },
-      { name: "description", content: "Gerencie seu perfil e altere sua senha" },
+      { name: "description", content: "Gerencie seu perfil e fale conosco" },
     ],
   }),
   component: PerfilPage,
@@ -34,15 +38,22 @@ export const Route = createFileRoute("/perfil")({
 function PerfilPage() {
   const { user, loading: authLoading, signOut } = useAuth();
   const { isApproved, loading: approvalLoading } = useApproval(user?.id);
+  const { preferences, setPreferences } = usePreferences();
   const navigate = useNavigate();
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [sendingFeedback, setSendingFeedback] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [language, setLanguage] = useState<AppLanguage>(preferences.language);
+  const [currency, setCurrency] = useState(preferences.currency);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const SEU_WHATSAPP = "543417819916"; 
 
   useEffect(() => {
     if (!authLoading && !user) navigate({ to: "/login" });
@@ -69,6 +80,7 @@ function PerfilPage() {
       setSuccess("Senha alterada com sucesso!");
       setNewPassword("");
       setConfirmPassword("");
+      toast.success("Senha atualizada!");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erro ao alterar senha");
     } finally {
@@ -76,21 +88,53 @@ function PerfilPage() {
     }
   }
 
-  async function handleDeleteAccount() {
-    setError("");
-    setSuccess("");
-    setDeleting(true);
-
+  async function handleSendFeedback() {
+    if (!feedback.trim()) return;
+    setSendingFeedback(true);
     try {
-      const { error } = await supabase.rpc("delete_user_account");
+      const { error } = await (supabase.from("feedbacks") as any).insert({
+        user_id: user?.id,
+        user_email: user?.email,
+        message: feedback.trim()
+      });
       if (error) throw error;
-      setDeleteDialogOpen(false);
+      toast.success("Feedback enviado! Obrigado.");
+      setFeedback("");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao enviar feedback.");
+    } finally {
+      setSendingFeedback(false);
+    }
+  }
+
+  const handleSupportClick = () => {
+    const msg = encodeURIComponent("Olá! Preciso de suporte com o GastroGestão.");
+    window.open(`https://wa.me/${SEU_WHATSAPP}?text=${msg}`, "_blank");
+  };
+
+  function handleSavePreferences() {
+    setPreferences({ language, currency });
+    toast.success("Preferências atualizadas!");
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    try {
+      // Chamada da função RPC que você criou no SQL do Supabase
+      const { error } = await (supabase.rpc as any)("delete_user_account");
+      
+      if (error) throw error;
+
+      toast.success("Conta excluída com sucesso.");
       await signOut();
       navigate({ to: "/login" });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erro ao excluir conta");
+      console.error(err);
+      toast.error("Erro ao excluir conta. Tente novamente.");
     } finally {
       setDeleting(false);
+      setDeleteDialogOpen(false);
     }
   }
 
@@ -98,106 +142,137 @@ function PerfilPage() {
   if (isApproved === false) return <BlockedScreen />;
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <PageHeader title="Perfil" subtitle="Gerencie sua conta" />
+    <div className="min-h-screen bg-[#faf7f2] pb-32 font-sans">
+      <PageHeader title="Perfil" subtitle="Gerencie sua conta e fale conosco" />
 
-      <div className="space-y-4 px-4">
-        {/* Info do Usuário */}
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-              <User className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="font-semibold text-foreground">{user.email}</p>
-              <p className="text-sm text-muted-foreground">Conta ativa</p>
+      <div className="space-y-6 px-4 max-w-md mx-auto mt-4">
+        {/* INFO DO USUÁRIO */}
+        <div className="rounded-[32px] border border-[#bc834e]/10 bg-white p-6 shadow-sm flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#bc834e]/10 text-[#bc834e]">
+            <User className="h-7 w-7" />
+          </div>
+          <div className="overflow-hidden">
+            <p className="font-black text-slate-900 truncate tracking-tight">{user.email}</p>
+            <div className="flex items-center gap-1">
+                <ShieldCheck size={12} className="text-green-600" />
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Acesso Ativo</p>
             </div>
           </div>
         </div>
 
-        {/* Alterar Senha */}
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
-            <KeyRound className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold text-foreground">Alterar Senha</h2>
+        {/* IDIOMA E MOEDA */}
+        <div className="rounded-[32px] border border-[#bc834e]/10 bg-white p-6 shadow-sm space-y-4">
+          <div>
+            <p className="text-[10px] font-black uppercase text-[#bc834e] mb-2 tracking-widest">Idioma do app</p>
+            <select
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as AppLanguage)}
+              className="h-12 w-full rounded-xl border border-[#bc834e]/20 bg-[#faf7f2] px-3 text-sm font-bold text-slate-700 outline-none"
+            >
+              <option value="pt-BR">Português</option>
+              <option value="es">Español</option>
+            </select>
           </div>
 
+          <div>
+            <p className="text-[10px] font-black uppercase text-[#bc834e] mb-2 tracking-widest">Moeda</p>
+            <select
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value)}
+              className="h-12 w-full rounded-xl border border-[#bc834e]/20 bg-[#faf7f2] px-3 text-sm font-bold text-slate-700 outline-none"
+            >
+              {APP_CURRENCIES.map((item) => (
+                <option key={item.code} value={item.code}>{item.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <Button onClick={handleSavePreferences} className="w-full h-12 bg-[#bc834e] text-white font-black rounded-xl active:scale-95 transition-all">
+            Salvar idioma e moeda
+          </Button>
+        </div>
+
+        {/* AJUDA E FEEDBACK */}
+        <div className="space-y-3">
+            <p className="text-[10px] font-black uppercase text-[#bc834e] ml-4 tracking-[0.2em]">Atendimento</p>
+            
+            <button onClick={handleSupportClick} className="w-full flex items-center justify-between bg-white p-5 rounded-[24px] border border-[#bc834e]/10 shadow-sm hover:shadow-md transition-all active:scale-95 group">
+                <div className="flex items-center gap-4">
+                    <div className="bg-green-100 p-3 rounded-2xl text-green-600"><MessageCircle size={24} /></div>
+                    <div className="text-left">
+                        <p className="font-black text-slate-900 text-sm uppercase">Suporte WhatsApp</p>
+                        <p className="text-[11px] text-slate-400 font-medium">Tire suas dúvidas agora</p>
+                    </div>
+                </div>
+            </button>
+
+            <div className="bg-white p-6 rounded-[32px] border border-[#bc834e]/10 shadow-sm space-y-4">
+                <div className="flex items-center gap-3 text-blue-600">
+                    <MessageSquare size={20} />
+                    <h3 className="font-black text-sm uppercase tracking-tight">Dar Feedback</h3>
+                </div>
+                <Textarea 
+                  placeholder="Como podemos melhorar o app para você?" 
+                  value={feedback} 
+                  onChange={(e) => setFeedback(e.target.value)} 
+                  className="min-h-[100px] rounded-2xl border-slate-100 bg-[#faf7f2] focus-visible:ring-[#bc834e] text-sm font-medium" 
+                />
+                <Button onClick={handleSendFeedback} disabled={sendingFeedback || !feedback.trim()} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl gap-2 active:scale-95 transition-all">
+                    <Send size={16} /> {sendingFeedback ? "Enviando..." : "Enviar Sugestão"}
+                </Button>
+            </div>
+        </div>
+
+        {/* SEGURANÇA */}
+        <div className="rounded-[32px] border border-[#bc834e]/10 bg-white p-6 shadow-sm">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="bg-[#bc834e]/10 p-2 rounded-lg"><KeyRound className="h-5 w-5 text-[#bc834e]" /></div>
+            <h2 className="font-black text-slate-900 uppercase text-xs tracking-widest">Alterar Senha</h2>
+          </div>
           <form onSubmit={handleChangePassword} className="space-y-3">
-            <Input
-              type="password"
-              placeholder="Nova senha (mín. 6 caracteres)"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              minLength={6}
-              className="h-12 text-base"
-            />
-            <Input
-              type="password"
-              placeholder="Confirmar nova senha"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={6}
-              className="h-12 text-base"
-            />
-
-            {error && (
-              <p className="rounded-xl bg-destructive/10 p-3 text-center text-sm text-destructive">
-                {error}
-              </p>
-            )}
-            {success && (
-              <p className="flex items-center justify-center gap-2 rounded-xl bg-green-100 p-3 text-center text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                <CheckCircle className="h-4 w-4" /> {success}
-              </p>
-            )}
-
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Salvando..." : "Alterar Senha"}
+            <Input type="password" placeholder="Nova senha" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className="h-12 rounded-xl bg-[#faf7f2] border-none" />
+            <Input type="password" placeholder="Confirme a senha" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className="h-12 rounded-xl bg-[#faf7f2] border-none" />
+            {error && <p className="rounded-xl bg-red-50 p-3 text-center text-xs font-bold text-red-600 border border-red-100">{error}</p>}
+            {success && <p className="rounded-xl bg-green-50 p-3 text-center text-xs font-bold text-green-700 border border-green-100">{success}</p>}
+            <Button type="submit" className="w-full h-12 bg-[#bc834e] text-white font-black rounded-xl active:scale-95 transition-all" disabled={submitting}>
+              {submitting ? "Salvando..." : "Atualizar Senha"}
             </Button>
           </form>
         </div>
 
-        {/* Sair */}
-        <Button
-          variant="outline"
-          className="w-full gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
-          onClick={signOut}
-        >
-          <LogOut className="h-4 w-4" /> Sair da conta
-        </Button>
-
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" className="w-full" disabled={deleting}>
-              {deleting ? "Excluindo..." : "Excluir Conta"}
+        {/* BOTÕES DE SAÍDA */}
+        <div className="space-y-3 pt-4">
+            <Button variant="outline" className="w-full h-12 gap-2 text-slate-500 border-slate-200 rounded-xl font-bold active:scale-95 transition-all" onClick={signOut}>
+                <LogOut className="h-4 w-4" /> Sair da conta
             </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Excluir conta permanentemente?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta acao remove sua conta e os dados relacionados. Esta operacao nao pode ser desfeita.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={(event) => {
-                  event.preventDefault();
-                  void handleDeleteAccount();
-                }}
-                disabled={deleting}
-              >
-                {deleting ? "Excluindo..." : "Sim, excluir conta"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
 
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogTrigger asChild>
+                    <button className="w-full flex items-center justify-center gap-2 text-center text-[10px] font-black text-red-400 uppercase tracking-widest hover:text-red-600 py-2 transition-colors">
+                       <Trash2 size={12} /> Excluir minha conta permanentemente
+                    </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-[32px] border-[#bc834e]/20">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="font-black text-slate-900">Atenção total!</AlertDialogTitle>
+                        <AlertDialogDescription className="font-medium text-slate-500">
+                            Ao excluir sua conta, **todos os seus dados** (insumos, receitas e histórico de lucro) serão apagados para sempre. Não há como desfazer isso.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex flex-col gap-2 sm:flex-row">
+                        <AlertDialogCancel className="rounded-xl font-bold border-slate-200">Cancelar</AlertDialogCancel>
+                        <AlertDialogAction 
+                          className="bg-red-600 text-white hover:bg-red-700 rounded-xl font-bold" 
+                          onClick={(event) => { event.preventDefault(); void handleDeleteAccount(); }} 
+                          disabled={deleting}
+                        >
+                            {deleting ? "Excluindo..." : "Sim, excluir tudo"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+      </div>
       <BottomNav />
     </div>
   );

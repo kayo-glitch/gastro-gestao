@@ -1,8 +1,21 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from "lucide-react";
+
+export function LoadingIndicator({ label = "Carregando dados..." }: { label?: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2 rounded-2xl border border-[#bc834e]/10 bg-white/80 px-4 py-3 text-sm font-bold text-[#bc834e] shadow-sm">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      <span>{label}</span>
+    </div>
+  );
+}
 
 export function DashboardSkeleton() {
   return (
     <div className="min-h-screen bg-background pb-24">
+      <div className="px-4 pt-6">
+        <LoadingIndicator />
+      </div>
       <div className="px-4 pb-4 pt-8">
         <Skeleton className="h-4 w-24 mb-2" />
         <Skeleton className="h-8 w-48 mb-1" />
@@ -32,6 +45,9 @@ export function DashboardSkeleton() {
 export function ListSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div className="min-h-screen bg-background pb-24">
+      <div className="px-4 pt-6">
+        <LoadingIndicator />
+      </div>
       <div className="px-4 pb-4 pt-6">
         <Skeleton className="h-7 w-28 mb-1" />
         <Skeleton className="h-4 w-20" />
@@ -49,6 +65,9 @@ export function AdminSkeleton() {
   return (
     <div className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-2xl">
+        <div className="mb-6">
+          <LoadingIndicator label="Carregando painel..." />
+        </div>
         <div className="mb-6 flex items-center gap-3">
           <Skeleton className="h-10 w-10 rounded-full" />
           <div>

@@ -2,18 +2,19 @@ import { Lock, MessageCircle, LogOut, Headset } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 
-const WHATSAPP_NUMBER = "5574999630510";
-const WHATSAPP_ACTIVATE = encodeURIComponent(
-  "Olá, criei minha conta no GastroGestão📈 e quero ativar meu acesso."
-);
-const WHATSAPP_SUPPORT = encodeURIComponent(
-  "Olá, preciso de suporte técnico com minha conta no GastroGestão📈."
-);
-const WHATSAPP_ACTIVATE_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_ACTIVATE}`;
-const WHATSAPP_SUPPORT_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_SUPPORT}`;
+const WHATSAPP_NUMBER = "543417819916";
 
 export function BlockedScreen() {
   const { signOut, user } = useAuth();
+  const accountEmail = user?.email ?? "e-mail não identificado";
+  const activateMessage = encodeURIComponent(
+    `Olá, criei minha conta no GastroGestão📈 e quero ativar meu acesso. Meu e-mail de cadastro é: ${accountEmail}`
+  );
+  const supportMessage = encodeURIComponent(
+    `Olá, preciso de suporte técnico com minha conta no GastroGestão📈. Meu e-mail de cadastro é: ${accountEmail}`
+  );
+  const activateUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${activateMessage}`;
+  const supportUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${supportMessage}`;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -38,14 +39,14 @@ export function BlockedScreen() {
           </p>
         )}
 
-        <a href={WHATSAPP_ACTIVATE_URL} target="_blank" rel="noopener noreferrer" className="block mt-8">
+        <a href={activateUrl} target="_blank" rel="noopener noreferrer" className="block mt-8">
           <Button size="lg" className="w-full gap-2 bg-[#25D366] hover:bg-[#20bd5a] text-white">
             <MessageCircle className="h-5 w-5" />
             Ativar minha conta via WhatsApp
           </Button>
         </a>
 
-        <a href={WHATSAPP_SUPPORT_URL} target="_blank" rel="noopener noreferrer" className="block mt-3">
+        <a href={supportUrl} target="_blank" rel="noopener noreferrer" className="block mt-3">
           <Button variant="outline" size="lg" className="w-full gap-2">
             <Headset className="h-5 w-5" />
             Falar com Suporte Técnico

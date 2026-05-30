@@ -8,6 +8,7 @@ export interface Insumo {
   purchasePrice: number;
   packageSize: number;
   unit: Unit;
+  recipeId?: string | null;
   /** @deprecated old format */
   price?: number;
 }
@@ -62,10 +63,23 @@ export interface Produto {
   ingredients: RecipeIngredient[];
   sellPrice?: number;
   wastePercent?: number;
-  channelId?: string;
+  channelId?: string; // Campo antigo (único)
+  channelIds?: string[]; // NOVO CAMPO: Múltiplos canais
   desiredMargin?: number;
   prepTime?: number; // tempo de preparo em minutos
-  quantidadePadrao?: number; // ADICIONE ESTA LINHA AQUI
+  quantidadePadrao?: number; 
+  rendimento_total?: number;
+  quantidade_venda?: number;
+  isBaseRecipe?: boolean;
+  is_base_recipe?: boolean;
+}
+
+export interface GastoAdicional {
+  id: string;
+  descricao: string;
+  valor: number;
+  tipo: 'Fixo' | 'Variável';
+  dataGasto: string;
 }
 
 /** Calcula preço de venda sugerido baseado no custo e margem desejada */
@@ -80,23 +94,33 @@ export function calculateSuggestedPrice(
   return cost / divisor;
 }
 
-/** Calcula custo de produção incluindo mão de obra */
 export function calculateProductCost(
   produto: Produto,
   insumos: Insumo[],
-  laborCostPerHour: number = 0
+  laborCostPerHour: number = 0,
+  allChannels: SalesChannel[] = []
 ): number {
   const baseCost = produto.ingredients.reduce((total, ing) => {
     const insumo = insumos.find((i) => i.id === ing.insumoId);
     if (!insumo) return total;
     return total + getUnitPrice(insumo) * ing.quantity;
   }, 0);
-  const waste = produto.wastePercent ?? 0;
-  const materialCost = baseCost * (1 + waste / 100);
-  const laborCost = produto.prepTime && laborCostPerHour > 0
-    ? (produto.prepTime / 60) * laborCostPerHour
-    : 0;
-  return materialCost + laborCost;
+
+  const materialCost = baseCost * (1 + (produto.wastePercent ?? 0) / 100);
+  const labor = (produto.prepTime && laborCostPerHour > 0) ? (produto.prepTime / 60) * laborCostPerHour : 0;
+
+  let totalChannelsTax = 0;
+  const ids = produto.channelIds || (produto.channelId ? [produto.channelId] : []);
+  
+  // A trava de segurança: só calcula taxa se sellPrice existir
+  if (ids.length > 0 && produto.sellPrice) {
+    ids.forEach(id => {
+      const channel = allChannels.find(c => c.id === id);
+      if (channel) totalChannelsTax += (produto.sellPrice! * (channel.taxPercent / 100));
+    });
+  }
+
+  return materialCost + labor + totalChannelsTax;
 }
 
 /** Lucro líquido real: Venda - Custo - Taxa do canal */
